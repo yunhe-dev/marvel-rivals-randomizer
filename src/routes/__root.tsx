@@ -6,49 +6,28 @@ import {
   Scripts,
   useRouterState,
 } from '@tanstack/react-router';
-import { Analytics } from '@/components/analytics/analytics';
-import { CrispChat } from '@/components/chatbox/crisp-chat';
 import { ThemeProvider } from '@/components/theme/theme-provider';
-import { Navbar } from '@/components/layout/navbar';
-import { Footer } from '@/components/layout/footer';
+import Navbar from '@/components/layout/navbar';
+import Container from '@/components/layout/container';
 import { DefaultNotFound } from '@/components/layout/default-not-found';
 import { Toaster } from '@/components/shared/toaster';
 import { websiteConfig } from '@/config/website';
 import appCss from '../styles.css?url';
 import { DefaultCatchBoundary } from '@/components/layout/default-catch-boundary';
-import { Routes } from '@/lib/routes';
-import { getCanonicalUrl, getOgImage, twitterHandleFromUrl } from '@/lib/urls';
-import {
-  getCanonicalPathname,
-  getLocale,
-  localeConfig,
-  locales,
-} from '@/lib/locale';
+import { getCanonicalUrl, getOgImage } from '@/lib/urls';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { Link } from '@tanstack/react-router';
 import { lazy } from 'react';
 
 const DevTools = import.meta.env.DEV
   ? lazy(() => import('@/integrations/devtools'))
   : () => null;
 
-/**
- * https://github.com/backpine/tanstack-start-on-cloudflare/blob/main/src/routes/__root.tsx
- */
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
 }>()({
   head: () => {
     const ogImage = getOgImage();
-    const twitterSite = websiteConfig.social?.twitter
-      ? twitterHandleFromUrl(websiteConfig.social.twitter)
-      : null;
-    const currentLocale = getLocale();
-    // OG locale format uses underscore (e.g. en_US, zh_CN), unlike BCP 47 used
-    // for <html lang> / hreflang which uses hyphens.
-    const ogLocale = localeConfig[currentLocale].hreflang.replace('-', '_');
-    const alternateOgLocales = locales
-      .filter((l) => l !== currentLocale)
-      .map((l) => localeConfig[l].hreflang.replace('-', '_'));
     return {
       meta: [
         { charSet: 'utf-8' },
@@ -56,20 +35,11 @@ export const Route = createRootRouteWithContext<{
         { title: websiteConfig.metadata?.title },
         { name: 'description', content: websiteConfig.metadata?.description },
         { name: 'theme-color', content: '#09090b' },
-        // Default OG / Twitter / canonical — pages with their own head()
-        // override these with page-specific values. These ensure 404 / error
-        // pages and any future route that forgets to call seo() still get
-        // shareable social metadata.
         { property: 'og:type', content: 'website' },
         {
           property: 'og:site_name',
           content: websiteConfig.metadata?.name ?? '',
         },
-        { property: 'og:locale', content: ogLocale },
-        ...alternateOgLocales.map((loc) => ({
-          property: 'og:locale:alternate',
-          content: loc,
-        })),
         { property: 'og:title', content: websiteConfig.metadata?.title ?? '' },
         {
           property: 'og:description',
@@ -78,9 +48,6 @@ export const Route = createRootRouteWithContext<{
         { property: 'og:url', content: getCanonicalUrl('/') },
         ...(ogImage ? [{ property: 'og:image', content: ogImage }] : []),
         { name: 'twitter:title', content: websiteConfig.metadata?.title ?? '' },
-        ...(twitterSite
-          ? [{ name: 'twitter:site', content: twitterSite }]
-          : []),
         {
           name: 'twitter:description',
           content: websiteConfig.metadata?.description ?? '',
@@ -116,33 +83,18 @@ export const Route = createRootRouteWithContext<{
       ],
     };
   },
-  // shellComponent automatically wraps root component, errorComponent, and notFoundComponent
   shellComponent: RootDocument,
   component: RootComponent,
   notFoundComponent: DefaultNotFound,
   errorComponent: DefaultCatchBoundary,
 });
 
-/**
- * Root component (wrapped by shellComponent: RootDocument)
- * Only marketing pages get Navbar + Footer; auth/dashboard/404 pages don't.
- */
 function RootComponent() {
   const pathname = useRouterState({ select: (s) => s.location.pathname }) ?? '';
-  const canonicalPathname = getCanonicalPathname(pathname);
   const matches = useRouterState({ select: (s) => s.matches }) ?? [];
-  const isAuthPages = canonicalPathname.startsWith(Routes.Auth);
-  const isProtectedPages =
-    canonicalPathname.startsWith(Routes.Admin) ||
-    canonicalPathname.startsWith(Routes.Dashboard) ||
-    canonicalPathname.startsWith(Routes.Settings);
-  // When no child route matches (e.g. /hello), only root is in matches; use minimal layout
-  const isNotFound =
-    canonicalPathname !== Routes.Root &&
-    canonicalPathname !== '' &&
-    matches.length <= 1;
+  const isNotFound = pathname !== '/' && pathname !== '' && matches.length <= 1;
 
-  if (isAuthPages || isProtectedPages || isNotFound) {
+  if (isNotFound) {
     return (
       <div className="flex min-h-screen flex-col">
         <main id="main-content" className="flex-1">
@@ -163,12 +115,26 @@ function RootComponent() {
   );
 }
 
-/**
- * Root document
- */
+function Footer() {
+  return (
+    <footer className="border-t border-white/10 py-8 text-center text-sm text-white/40">
+      <Container>
+        <p className="font-bold text-white/60 mb-2">🎲 RivalsRandomizer</p>
+        <p>Fan-made Marvel Rivals tool — random hero picker, team generator & challenge creator.</p>
+        <p className="mt-1">Not affiliated with Marvel or NetEase Games.</p>
+        <div className="flex justify-center gap-4 mt-4 text-xs">
+          <Link to="/terms" className="hover:text-white/60 transition-colors">Terms of Service</Link>
+          <Link to="/privacy" className="hover:text-white/60 transition-colors">Privacy Policy</Link>
+          <Link to="/cookie" className="hover:text-white/60 transition-colors">Cookie Policy</Link>
+        </div>
+      </Container>
+    </footer>
+  );
+}
+
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang={localeConfig[getLocale()].hreflang} suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
@@ -180,8 +146,6 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           </TooltipProvider>
         </ThemeProvider>
         <DevTools />
-        <Analytics />
-        <CrispChat />
         <Scripts />
       </body>
     </html>
